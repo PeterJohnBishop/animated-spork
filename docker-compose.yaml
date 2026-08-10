@@ -1,0 +1,61 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres_db
+    environment:
+      POSTGRES_USER: app_user
+      POSTGRES_PASSWORD: app_password
+      POSTGRES_DB: app_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - app-network
+
+  gin-server:
+    build:
+      context: ./servegin     
+    container_name: gin_server
+    environment:
+      - PORT=3000
+      - DB_HOST=postgres
+      - DB_USER=app_user
+      - DB_PASSWORD=app_password
+      - DB_NAME=app_db
+    depends_on:
+      - postgres
+    networks:
+      - app-network
+
+  node-server:
+    build:
+      context: ./servenode
+    container_name: node_server
+    environment:
+      - PORT=3000
+      - DATABASE_URL=postgres://app_user:app_password@postgres:5432/app_db
+    depends_on:
+      - postgres
+    networks:
+      - app-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx_proxy
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - gin-server
+      - node-server
+    networks:
+      - app-network
+
+volumes:
+  pgdata:
+
+networks:
+  app-network:
+    driver: bridge
